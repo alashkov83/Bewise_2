@@ -1,11 +1,13 @@
 version: "3.9"
 services:
   apiapp:
-    container_name: apiapp_container
+    container_name: pigwav_container
     build:
       context: .
     environment:
-      POSTGTRES_SQL_URI: "postgresql://mp3user:mp31234@postgres_container:5432/mp3db"
+      POSTGTRES_SQL_URI: "postgresql://pigwavuser:pigwav1234@pigwavdb_container:5432/pigwavdb"
+      API_HOSTNAME: "localhost"
+      API_PORT: "8080"
     depends_on:
       - postgres
     restart: unless-stopped
@@ -23,7 +25,7 @@ services:
       - backend
 
   postgres:
-    container_name: postgres_container
+    container_name: pigwavdb_container
     image: postgres:13.11
     command:
       - "postgres"
@@ -56,9 +58,9 @@ services:
       - "-c"
       - "pg_stat_statements.track=all"
     environment:
-      POSTGRES_DB: "mp3db"
-      POSTGRES_USER: "mp3user"
-      POSTGRES_PASSWORD: "mp31234"
+      POSTGRES_DB: "pigwavdb"
+      POSTGRES_USER: "pigwavuser"
+      POSTGRES_PASSWORD: "pigwav1234"
       PGDATA: "/var/lib/postgresql/data/pgdata"
     volumes:
       - ./initdb:/docker-entrypoint-initdb.d
@@ -70,7 +72,7 @@ services:
       - admin_db
       - apiapp
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U quizuser -d quizdb"]
+      test: ["CMD-SHELL", "pg_isready -U pigwavuser -d pigwavdb"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -85,12 +87,12 @@ services:
       - backend
 
   pgadmin:
-    container_name: pgadmin_container
+    container_name: pigwavadmin_container
     image: dpage/pgadmin4:7.1
     user: root
     environment:
-      PGADMIN_DEFAULT_EMAIL: "mp3@quiz.com"
-      PGADMIN_DEFAULT_PASSWORD: "mp31234"
+      PGADMIN_DEFAULT_EMAIL: "pigwav@pigwav.com"
+      PGADMIN_DEFAULT_PASSWORD: "pigwav1234"
       PGADMIN_CONFIG_SERVER_MODE: 'False'
     volumes:
       - ./pgadmin:/var/lib/pgadmin

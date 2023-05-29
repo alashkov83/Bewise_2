@@ -4,7 +4,8 @@ import os
 import socket
 import uuid
 from collections import namedtuple
-from io import StringIO, BytesIO
+from http import HTTPStatus
+from io import BytesIO
 from urllib.parse import urlunparse, urlencode
 
 from flask import Flask, jsonify, Response, make_response, request
@@ -26,18 +27,12 @@ class User(db.Model):
     user_token = Column(String(36), nullable=False, index=True)
     user_name = Column(String(20), nullable=False, default="")
 
-    def to_json(self) -> Response:
-        return jsonify({"quiz_id"   : self.quiz_id,
-                        "quiz_txt"  : self.quiz_txt,
-                        "answer_txt": self.answer_txt,
-                        "quiz_date" : self.quiz_date.isoformat()})
-
 
 class Record(db.Model):
     __tablename__: str = 'record'
-    id: int = Column(Integer, autoincrement=True, index=True, primary_key=True)
-    mp3_token: str = Column(String(36), nullable=False, index=True)
-    user_id: int = Column(Integer, ForeignKey("user.id"))
+    id = Column(Integer, autoincrement=True, index=True, primary_key=True)
+    mp3_token = Column(String(36), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("user.id"))
     mp3_data = Column(LargeBinary)
 
     def resp_mp3(self):
@@ -66,13 +61,13 @@ def generate_url(record_id, user_id):
         field_names=['scheme', 'netloc', 'url', 'path', 'query', 'fragment']
     )
     query_params = {
-        'id': record_id,
+        'id'  : record_id,
         'user': user_id
     }
     url = urlunparse(
         Components(
             scheme='http',
-            netloc=API_HOSTNAME+':'+str(API_PORT),
+            netloc=API_HOSTNAME + ':' + str(API_PORT),
             query=urlencode(query_params),
             path='record',
             url='/',
@@ -85,39 +80,39 @@ def generate_url(record_id, user_id):
 @app.route('/add_user', methods=['POST'])
 def add_user():
     content_type = request.headers.get('Content-Type')
-    if (content_type != 'application/json'):
-        return jsonify({}), 400
+    if content_type != 'application/json':
+        return jsonify({}), HTTPStatus.BAD_REQUEST
     json = request.get_json()
     user_name = json.get('name', None)
     if user_name is None:
-        return jsonify({}), 400
+        return jsonify({}), HTTPStatus.BAD_REQUEST
     user_token = str(uuid.uuid4())
     new_user = User(user_name=user_name, user_token=user_token)
     db.session.add(new_user)
     db.session.flush()
     user_id = new_user.id
     db.session.commit()
-    return jsonify({"id": user_id, "token": user_token}), 200
+    return jsonify({"id": user_id, "token": user_token}), HTTPStatus.OK
 
 
 @app.route('/add_wav', methods=['POST'])
 def add_record():
     content_type = request.headers.get('Content-Type')
-    if (content_type != 'application/json'):
-        return jsonify({}), 400
+    if content_type != 'application/json':
+        return jsonify({}), HTTPStatus.BAD_REQUEST
     json = request.get_json()
     user_id = json.get('user_id')
     user_token = json.get('user_token')
     if user := db.session.query(User).filter(User.id == user_id).first():
         if user.user_token != user_token:
-            return jsonify({}), 403
+            return jsonify({}), HTTPStatus.FORBIDDEN
     else:
-        return jsonify({}), 403
+        return jsonify({}), HTTPStatus.FORBIDDEN
     coded_wav = json.get('wav')
     try:
         wav = base64.b64decode(coded_wav)
     except binascii.Error:
-        return jsonify({}), 400
+        return jsonify({}), HTTPStatus.BAD_REQUEST
     mp3_data = wav2mp3(wav)
     token_record = str(uuid.uuid4())
     new_record = Record(mp3_token=token_record, user_id=user_id, mp3_data=mp3_data)
@@ -125,22 +120,21 @@ def add_record():
     db.session.commit()
     return generate_url(token_record, user_id)
 
+
 @app.route('/record', methods=['GET'])
 def get_record():
-    print(request.args)
     user_id = request.args.get('user', None)
     mp3_id = request.args.get('id', None)
     if user_id is None or mp3_id is None:
-        return "", 400
+        return "", HTTPStatus.BAD_REQUEST
     try:
         user_id = int(user_id)
     except ValueError:
-        return "", 400
+        return "", HTTPStatus.BAD_REQUEST
     record = db.session.query(Record).filter(Record.mp3_token == mp3_id and Record.user_id == user_id).first()
     if record:
-        return record.resp_mp3()
-    return "", 404
-
+        return record.resp_mp3(), HTTPStatus.OK
+    return "", HTTPStatus.NOT_FOUND
 
 
 if __name__ == '__main__':
