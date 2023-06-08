@@ -131,7 +131,7 @@ def get_record():
         user_id = int(user_id)
     except ValueError:
         return "", HTTPStatus.BAD_REQUEST
-    record = db.session.query(Record).filter(Record.mp3_token == mp3_id and Record.user_id == user_id).first()
+    record = db.session.query(Record).filter(Record.mp3_token == mp3_id, Record.user_id == user_id).first()
     if record:
         return record.resp_mp3(), HTTPStatus.OK
     return "", HTTPStatus.NOT_FOUND
